@@ -1,9 +1,12 @@
 #############################################################
 #IMPORTS
 #############################################################
+import datetime
 import quandl, math
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib import style
 from sklearn import preprocessing, svm
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -37,7 +40,10 @@ NOTE: svm.SVR also provides other kernals for use such as 'linear', 'poly',
 'sigmoid', 'precomputed', or a callable implementation. (See documentaion)
 
 """
-
+#############################################################
+#PLOT
+#############################################################
+style.use('ggplot')
 
 #############################################################
 #DATASTREAM MANIPULATION
@@ -57,7 +63,9 @@ df['PCT_change'] = (df['Adj. Close'] - df['Adj. Open']) / df['Adj. Open'] * 100
 df = df[['Adj. Close', 'HL_PCT', 'PCT_change', 'Adj. Volume']]
 
 
-print(df.head())
+
+#print(df.head())
+
 
 
 #Defining the forecasting column that will initially be filled
@@ -78,6 +86,7 @@ y = np.array(df['label'])
 
 x = preprocessing.scale(x)
 
+x_recent = x[-forecast_out:]
 
 #############################################################
 #DEFINING/TRAINING/TESTING THE CLASSIFIER
@@ -98,16 +107,50 @@ confidence = clf.score(x_test, y_test)
 #Regression algorithm!!! -1 means only available threads are used
 clf = LinearRegression(n_jobs=-1)
 
+
+#VERBOSE FORCAST AND CONFIDENCE!!!!
+'''
 #Testing types of svm.SVR kernals
 for i in ['linear','poly','rbf','sigmoid']:
     clf= svm.SVR(kernel=i)
     clf.fit(x_train, y_train)
     confidence = clf.score(x_test, y_test)
+    forecast_set = clf.predict(x_recent)
     print(i,confidence)
+    print(forecast_set)
+    print()
+'''
 
+clf.fit(x_train, y_train)
+confidence = clf.score(x_test, y_test)
+forecast_set = clf.predict(x_recent)
 
+#Adding a forecast column to the dataframe
+df['Forecast'] = np.nan
 
+#############################################################
+#VISUALIZING THE DATA
+#############################################################
+last_date = df.iloc[-1].name
+last_unix = last_date.timestamp()
 
+one_day = 86400
+
+next_unix = last_unix + one_day
+
+#For each day's forecast, set values in dataframe
+for i in forecast_set:
+    next_date = datetime.datetime.fromtimestamp(next_unix)
+    next_unix += 86400
+    df.loc[next_date] = [np.nan for _ in range(len(df.columns)-1)]+[i]
+
+#Plotting
+df['Adj. Close'].plot()
+df['Forecast'].plot()
+plt.legend(loc = 4)
+plt.xlabel('Date')
+plt.ylabel('Price')
+plt.show()
 
 
 
